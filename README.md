@@ -26,7 +26,7 @@ node genkey.mjs
 # 3. 把 gitconfig.example / ssh_config.example 复制成 gitconfig / ssh_config，
 #    把里面的 <TOOLS_ROOT> 换成本目录的绝对路径
 
-# 4. 激活
+# 4. 激活（它会把 GIT_SSH 指向 ssh-github.cmd —— 这一步别省，见拦路虎 6）
 . .\git-env.ps1
 
 # 5. 把 github_ed25519.pub 的内容贴到 GitHub
@@ -44,10 +44,11 @@ ssh -T git@github.com
 | 文件 | 作用 |
 |---|---|
 | `git-env.ps1` | **入口**。dot-source 它就能用 git + 身份 |
+| `ssh-github.cmd` | ssh 启动器。让 git **不经 shell** 直接 exec ssh（见拦路虎 6） |
 | `genkey.mjs` | 生成 ed25519 密钥对（含关键绕法，注释里写清了为什么） |
 | `fetch-mingit.mjs` | 下载 MinGit，多镜像自动回退 |
 | `rm.mjs` | 删除工具。PowerShell 删不掉的用它 |
-| `gitconfig.example` | 提交身份 + `core.sshCommand` 模板 |
+| `gitconfig.example` | 提交身份模板（**故意不含 `core.sshCommand`**） |
 | `ssh_config.example` | ssh 客户端配置模板 |
 
 设计上有一条硬原则：**所有状态都待在项目目录里**。不写 `C:\Users\<user>\.ssh`，
@@ -55,7 +56,7 @@ ssh -T git@github.com
 
 ---
 
-## 五个拦路虎
+## 六个拦路虎
 
 ### 1. 所有走系统 TLS 的 HTTPS 都失败
 
@@ -128,6 +129,47 @@ spawnSync('ssh-keygen', ['-t','ed25519','-f',keyPath,'-N','','-C',comment],
 
 后果：生成过程**必然**留下锁死的残骸。本项目不试图清理它们，
 只建议集中放进一个明确命名的目录并写清楚，别让后来的人误以为那些是有效密钥。
+
+### 6. `git push` 根本起不来 —— MSYS2 的 `sh.exe` 在沙箱里必死
+
+**症状**
+
+```
+sh.exe: *** fatal error - couldn't create signal pipe, Win32 error 5
+fatal: Could not read from remote repository.
+```
+
+`git ls-remote` 也一样失败，不只是 push。
+
+**诊断**：git for Windows 会把 `core.sshCommand` 和 `GIT_SSH_COMMAND`
+交给 MSYS2 的 `sh.exe` 去执行。而 MSYS2 运行时启动时**必须创建一个 signal
+pipe——那是个命名管道**，DSH 沙箱禁止进程打开命名管道。
+所以 `sh.exe` 连启动都做不到。
+
+**绕法**：改用 **`GIT_SSH`**。它接受一个**程序路径**，git 会**直接 exec**，
+中间不经过 shell。代价是 `GIT_SSH` 不能携带参数，所以把参数装进一个包装器：
+
+```bat
+@echo off
+"%SystemRoot%\System32\OpenSSH\ssh.exe" -F "%~dp0github-identity\ssh_config" %*
+```
+
+两个细节值得留意：
+
+- 用 `%~dp0` 而不是写死路径，脚本本身就能保持**纯 ASCII**——中文路径由 cmd
+  在运行时以 UTF-16 展开，不会被读坏。
+- 用**系统自带的 OpenSSH**，不要用 MinGit 里的 `usr\bin\ssh.exe`：
+  后者是 MSYS 构建，会撞上同一套运行时问题。
+
+**顺带排除的一条错路**：曾想用 `HOME` 环境变量把 ssh 配置挪进项目目录，
+**微软版 OpenSSH 不读 `HOME`**，它认 `%USERPROFILE%`。
+这类事不要靠猜，`ssh -G` 会把最终生效的配置全部打印出来：
+
+```powershell
+ssh -G git@github.com | Select-String 'identityfile|userknownhostsfile|stricthostkeychecking'
+```
+
+正是这一条把「config 到底有没有被读到」从猜测变成了事实。
 
 ---
 

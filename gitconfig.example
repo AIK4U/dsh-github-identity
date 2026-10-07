@@ -1,18 +1,22 @@
 # Git identity template.
 #
-# Copy to `gitconfig`, replace <TOOLS_ROOT> with this directory's absolute
-# path (forward slashes), then activate with `git-env.ps1`.
+# Copy to `gitconfig`, replace <YOUR NAME> / <YOUR EMAIL>, then activate with
+# `git-env.ps1`.
 #
 # Why not `git config --global`? Because that writes to
 # C:\Users\<user>\.gitconfig, which the DSH file sandbox denies. Pointing
 # GIT_CONFIG_GLOBAL at this file keeps everything inside the project dir.
+#
+# NOTE: there is deliberately NO core.sshCommand here. git runs
+# core.sshCommand and GIT_SSH_COMMAND through MSYS2's sh.exe, which cannot
+# start under the sandbox - see "拦路虎 6" in README.md. The SSH launcher is
+# wired up through the GIT_SSH environment variable in git-env.ps1 instead.
 
 [user]
 	name = <YOUR NAME>
 	email = <YOUR EMAIL>
 
 [core]
-	sshCommand = ssh -F "<TOOLS_ROOT>/github-identity/ssh_config"
 	autocrlf = true
 	quotepath = false
 

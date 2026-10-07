@@ -20,14 +20,21 @@ $gitExe = Join-Path $gitCmd 'git.exe'
 $gitConfig = Join-Path $toolsRoot 'gitconfig'
 $sshConfig = Join-Path $toolsRoot 'github-identity\ssh_config'
 $privateKey = Join-Path $toolsRoot 'github-identity\github_ed25519'
+$sshLauncher = Join-Path $toolsRoot 'ssh-github.cmd'
 
-foreach ($p in @($gitExe, $gitConfig, $sshConfig, $privateKey)) {
+foreach ($p in @($gitExe, $gitConfig, $sshConfig, $privateKey, $sshLauncher)) {
     if (-not (Test-Path $p)) { throw "git-env: missing required file: $p" }
 }
 
 $env:PATH = $gitCmd + ';' + $env:PATH
 $env:GIT_CONFIG_GLOBAL = $gitConfig
-$env:GIT_SSH_COMMAND = 'ssh -F "' + ($sshConfig -replace '\\', '/') + '"'
+
+# GIT_SSH, NOT GIT_SSH_COMMAND and NOT core.sshCommand.
+# Those two are handed to MSYS2's sh.exe, which cannot start under the DSH
+# sandbox ("couldn't create signal pipe, Win32 error 5" - a named pipe).
+# GIT_SSH is exec'd directly, with no shell in the path.
+$env:GIT_SSH = $sshLauncher
+Remove-Item Env:\GIT_SSH_COMMAND -ErrorAction SilentlyContinue
 
 Write-Host "git      : $(& $gitExe --version)"
 Write-Host "identity : $(& $gitExe config --get user.name) <$(& $gitExe config --get user.email)>"
