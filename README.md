@@ -48,8 +48,22 @@ ssh -T git@github.com
 | `genkey.mjs` | 生成 ed25519 密钥对（含关键绕法，注释里写清了为什么） |
 | `fetch-mingit.mjs` | 下载 MinGit，多镜像自动回退 |
 | `rm.mjs` | 删除工具。PowerShell 删不掉的用它 |
+| `gh-account.mjs` | 走 REST API 看账号与仓库列表（Schannel 坏了，只能用 Node 的 fetch） |
+| `gh-verify.mjs` | **独立核对**推送结果，并检查有没有把密钥提交上去 |
 | `gitconfig.example` | 提交身份模板（**故意不含 `core.sshCommand`**） |
 | `ssh_config.example` | ssh 客户端配置模板 |
+
+一条贯穿始终的习惯：**不要拿退出码当证据。**
+`git push` 退出 0 只说明命令跑完了。真正算数的是从远端读回来的东西：
+
+```
+$ node gh-verify.mjs <owner>/<repo> README.md LICENSE
+...
+KEY_MATERIAL_LEAKED none
+```
+
+这个检查不是形式主义——一个专门讲「怎么配 SSH 密钥」的仓库，
+恰恰是最容易顺手把私钥提交上去的地方。
 
 设计上有一条硬原则：**所有状态都待在项目目录里**。不写 `C:\Users\<user>\.ssh`，
 不写 `.gitconfig`，不装到 `Program Files`。整个目录可以连同便携盘一起搬走。
