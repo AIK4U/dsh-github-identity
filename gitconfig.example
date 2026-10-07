@@ -1,0 +1,23 @@
+# Git identity template.
+#
+# Copy to `gitconfig`, replace <TOOLS_ROOT> with this directory's absolute
+# path (forward slashes), then activate with `git-env.ps1`.
+#
+# Why not `git config --global`? Because that writes to
+# C:\Users\<user>\.gitconfig, which the DSH file sandbox denies. Pointing
+# GIT_CONFIG_GLOBAL at this file keeps everything inside the project dir.
+
+[user]
+	name = <YOUR NAME>
+	email = <YOUR EMAIL>
+
+[core]
+	sshCommand = ssh -F "<TOOLS_ROOT>/github-identity/ssh_config"
+	autocrlf = true
+	quotepath = false
+
+[init]
+	defaultBranch = main
+
+[push]
+	default = simple

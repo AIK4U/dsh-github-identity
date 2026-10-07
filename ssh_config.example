@@ -1,0 +1,30 @@
+# SSH client config template.
+#
+# Copy to `github-identity/ssh_config` and replace <TOOLS_ROOT> with this
+# directory's absolute path (forward slashes).
+#
+# Why point IdentityFile and UserKnownHostsFile at the project dir?
+# Because stock ssh tries to write C:\Users\<user>\.ssh\known_hosts, which
+# the DSH file sandbox denies:
+#     Could not create directory 'C:\Users\<user>/.ssh' (Permission denied).
+# Keeping both paths inside the project removes that failure entirely.
+
+Host github.com
+    HostName github.com
+    User git
+    Port 22
+    IdentityFile "<TOOLS_ROOT>/github-identity/github_ed25519"
+    IdentitiesOnly yes
+    UserKnownHostsFile "<TOOLS_ROOT>/github-identity/known_hosts"
+    StrictHostKeyChecking accept-new
+
+# Fallback for networks that block port 22.
+# Use:  git remote set-url origin git@github-443:<owner>/<repo>.git
+Host github-443
+    HostName ssh.github.com
+    User git
+    Port 443
+    IdentityFile "<TOOLS_ROOT>/github-identity/github_ed25519"
+    IdentitiesOnly yes
+    UserKnownHostsFile "<TOOLS_ROOT>/github-identity/known_hosts"
+    StrictHostKeyChecking accept-new
