@@ -16,13 +16,31 @@ if (!slug || !slug.includes('/')) {
   process.exit(2);
 }
 
-const HEADERS = { 'User-Agent': 'dsh-gh-check', Accept: 'application/vnd.github+json' };
+const HEADERS = { 'User-Agent': 'gh-verify', Accept: 'application/vnd.github+json' };
 
 async function getJson(url) {
   const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} for ${url}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
+
+// Filenames that are key material. Deliberately narrow: an earlier version of
+// this list contained the bare word "credential", which flagged
+// "verify-credential.mjs" - the checker accused its own sibling. Match shapes,
+// not topic words.
+const KEY_PATTERNS = [
+  /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
+  /\.(pem|key|p12|pfx|ppk)$/i,
+  /^\.?credentials?\.(ya?ml|json)$/i,
+  /^\.env(\.|$)/i,
+  /^known_hosts(\.old)?$/i,
+  /_ed25519$/i,
+  /_rsa$/i,
+];
 
 async function main() {
   const repo = await getJson(`https://api.github.com/repos/${slug}`);
@@ -32,14 +50,24 @@ async function main() {
   console.log('pushed_at     :', repo.pushed_at);
   console.log('html_url      :', repo.html_url);
 
-  const commit = await getJson(`https://api.github.com/repos/${slug}/commits/${repo.default_branch}`);
-  const c = commit.commit || {};
-  const a = c.author || {};
   console.log('--- latest commit ---');
-  console.log('sha    :', commit.sha);
-  console.log('message:', (c.message || '').split('\n')[0]);
-  console.log('author :', a.name, '<' + a.email + '>');
-  console.log('date   :', a.date);
+  try {
+    const commit = await getJson(`https://api.github.com/repos/${slug}/commits/${repo.default_branch}`);
+    const c = commit.commit || {};
+    const a = c.author || {};
+    console.log('sha    :', commit.sha);
+    console.log('message:', (c.message || '').split('\n')[0]);
+    console.log('author :', a.name, '<' + a.email + '>');
+    console.log('date   :', a.date);
+  } catch (e) {
+    // A repository with no commits answers 409 (and 404 before it is ready).
+    // That is a state, not a failure - report it and carry on to the files.
+    if (e.status === 409 || e.status === 404) {
+      console.log('(no commits yet - repository is empty)');
+    } else {
+      throw e;
+    }
+  }
 
   const files = await getJson(`https://api.github.com/repos/${slug}/contents/`);
   if (!Array.isArray(files)) throw new Error('unexpected contents payload');
@@ -52,9 +80,7 @@ async function main() {
     console.log('MISSING', missing.length === 0 ? 'none' : missing.join(', '));
   }
 
-  const leaked = files
-    .map((f) => f.name)
-    .filter((n) => /ed25519|id_rsa|\.pem$|\.key$|known_hosts|credential|\.env$/i.test(n));
+  const leaked = files.map((f) => f.name).filter((n) => KEY_PATTERNS.some((re) => re.test(n)));
   console.log('KEY_MATERIAL_LEAKED', leaked.length === 0 ? 'none' : leaked.join(', '));
 }
 
