@@ -1,7 +1,7 @@
 # Activate the portable git toolchain and 顾砚's GitHub publishing identity.
 #
 # Usage (from any DSH session):
-#     . E:\大肥鱼\大肥鱼工位\_tools\git-env.ps1
+#     . <你的工作区>\插件打包\..\_tools\git-env.ps1   （本机：E:\顾砚桌面\顾砚\工位\_tools\git-env.ps1）
 #
 # Pure ASCII on purpose: PowerShell 5.1 / cmd mis-read non-ASCII script
 # bodies on this machine. All paths are derived from $PSScriptRoot, so the
